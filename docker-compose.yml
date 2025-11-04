@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: jwt-postgres
+    environment:
+      POSTGRES_DB: jwt_auth
+      POSTGRES_USER: jwt_user
+      POSTGRES_PASSWORD: jwt_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jwt_user -d jwt_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jwt-network
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./jwt-authentication-be
+      dockerfile: Dockerfile
+    container_name: jwt-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/jwt_auth
+      SPRING_DATASOURCE_USERNAME: jwt_user
+      SPRING_DATASOURCE_PASSWORD: jwt_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jwt-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./jwt-authentication-fe
+      dockerfile: Dockerfile
+    container_name: jwt-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - jwt-network
+
+networks:
+  jwt-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
